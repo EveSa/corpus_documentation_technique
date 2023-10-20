@@ -19,8 +19,9 @@ Les statistiques de corpus exposée ci-après ont été calculée par le script 
 
 ## Statistiques de Corpus
 
-|longueur moyenne des textes | longueur médiane |
-|----------------------------|------------------|
-| 16370.26 | 15927.5 |
+|| nb de mots | nb de phrases | nb de tokens |
+|:--:| :---------:|:----------:|:--------------:|
+|moyenne| 16177 | 4362 |NC|
+|mediane| 15925 | 2242 | NC|
 
 ![distribution de la taille des textes](image/Distribution_taille_texte.png)
