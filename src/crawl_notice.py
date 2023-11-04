@@ -1,19 +1,20 @@
-import requests
-import lxml.html
-import urllib.parse
 import logging
-import re
+import os
 import time
+import urllib.parse
 from itertools import cycle
-from fake_useragent import UserAgent
 from pathlib import Path
+
+import lxml.html
+import requests
+from fake_useragent import UserAgent
 
 ua = UserAgent()
 
 logging.basicConfig(level=logging.INFO)
 
 url = "https://www.notice-facile.com"
-save_path = "/people/sauvage/Documents/corpus_document_technique/pdf/"
+SAVE_PATH = os.path.join(os.getcwd(), "pdf")
 # page = "manuel-notice-mode-emploi/"
 
 headers = {
@@ -57,17 +58,23 @@ def proxy_requests(url):
     proxy = next(proxy_cycle)
     proxies = lambda proxy: {"http": proxy, "https": proxy}
     for i in range(len(ip_addresses)):
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
+        try :
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as err :
+            logging.info(f"......Wrong status code because of {err} - Sleeping for 1 min")
             time.sleep(60)
+            return False
             try:
+                logging.info(f"......Requesting with {proxy} proxy")
                 response = requests.get(
                     url, headers=headers, proxies=proxies(proxy), timeout=5
                 )
-            except:
+                response.raise_for_status()
+            except requests.exceptions.RequestException as err2:
                 proxy = next(proxy_cycle)
-                logging.info(f"...Trying with another proxy")
-    return response
+                logging.info(f"...... err: {err2}\n......Trying with another proxy")
 
 
 response = proxy_requests(url)
@@ -79,6 +86,8 @@ p_list = html_element.xpath('//a[@class="marque_title"]/@href')
 for p in p_list:
     logging.info(f"Treating {p} brand model")
     response = proxy_requests(urllib.parse.urljoin(url, p))
+    if response == False:
+        break
     notices_element = lxml.html.fromstring(response.content)
     model_list = notices_element.xpath('//a[@class="notice_title"]/@href')
     # # A enlever après test
@@ -86,16 +95,21 @@ for p in p_list:
     # model_list = ["/notice/17757/+A-ONE+DV5601HDMI+"]
     # ########################
     for model in model_list:
-        time.sleep(5)
         logging.info(f"...Collecting documentation for {model}")
+        if os.path.exists(os.path.join(SAVE_PATH, model.split('/')[-1] + ".pdf")):
+            logging.info(f"......Documentation already collected\n\n")
+            break
+        time.sleep(5)
         response = proxy_requests(urllib.parse.urljoin(url, model))
+        if response == False:
+            break
         model_element = lxml.html.fromstring(response.content)
         # model_language = ' '.join(model_element.xpath('//p/a[text()="Cliquez ici"]/ancestor-or-self::p/text()'))
         # if re.search("Français", model_language):
         # logging.info(f"......documentation language : french")
         # model_notice = model_element.xpath('//a[@class="notice_title]/@href')
         # response = requests.get(urllib.parse.urljoin(url, model_notice[0]), headers = headers, proxies = proxies(proxy))
-        # with open(save_path+'shit.html', 'w') as file:
+        # with open(SAVE_PATH+'shit.html', 'w') as file:
         #     file.write(response.text)
         # documentation_element = lxml.html.fromstring(response.content)
         documentation_url = model_element.xpath(
@@ -103,18 +117,14 @@ for p in p_list:
         )
         if documentation_url == []:
             break
-        for i in range(len(ip_addresses)):
-            try:
-                documentation = proxy_requests(documentation_url[0])
-                break
-            except:
-                proxy = next(proxy_cycle)
-        
-        save_file = Path(os.path.join(save_path, model+'.pdf'))
-        file.parent.mkdir(parents=True, exist_ok=True)
-        file.write(documentation.content)
-        # with open(save_path + model.replace("/", "_") + ".pdf", "wb") as save_file:
-        #     save_file.write(documentation.content)
+        documentation = proxy_requests(documentation_url[0])
+        if documentation == False:
+            break
+
+        save_file = Path(os.path.join(SAVE_PATH, model.split('/')[-1] + ".pdf"))
+        save_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(save_file, "wb") as s_file:
+            s_file.write(documentation.content)
         logging.info(f"...Collected !\n\n")
         # else :
         # logging.info(f"...no french documentation")
